@@ -1,18 +1,138 @@
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
+using System.Collections.Generic;
+
+[System.Serializable]
+public class Sound
+{
+    public string name;
+    public AudioClip clip;
+    [Range(0f, 1f)] public float volume = 1f;
+    [Range(0.1f, 3f)] public float pitch = 1f;
+    public bool loop = false;
+
+    [HideInInspector] public AudioSource source;
+}
 
 public class AudioManager : MonoBehaviour
 {
-    // Start is called before the first frame update
-    void Start()
+    private static AudioManager instance;
+    public static AudioManager Instance => instance;
+
+    [Header("Audio Settings")]
+    [SerializeField] private Sound[] sounds;
+    [SerializeField] private AudioSource musicSource;
+    [SerializeField] private AudioSource sfxSource;
+
+    private float masterVolume = 1f;
+    private float sfxVolume = 1f;
+    private float musicVolume = 1f;
+    private bool isMuted = false;
+
+    private Dictionary<string, Sound> soundDict = new Dictionary<string, Sound>();
+
+    private void Awake()
     {
-        
+        if (instance == null)
+        {
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
+            return;
+        }
+
+        foreach (Sound sound in sounds)
+        {
+            sound.source = gameObject.AddComponent<AudioSource>();
+            sound.source.clip = sound.clip;
+            sound.source.volume = sound.volume;
+            sound.source.pitch = sound.pitch;
+            sound.source.loop = sound.loop;
+
+            soundDict[sound.name] = sound;
+        }
+
+        if (musicSource == null)
+            musicSource = gameObject.AddComponent<AudioSource>();
+        musicSource.loop = true;
     }
 
-    // Update is called once per frame
-    void Update()
+    private void Start()
     {
-        
+        PlayMusic("Background");
     }
+
+    public void PlaySFX(string name)
+    {
+        if (isMuted) return;
+
+        if (soundDict.TryGetValue(name, out Sound sound))
+        {
+            sound.source.volume = sound.volume * sfxVolume * masterVolume;
+            sound.source.Play();
+        }
+        else
+        {
+            Debug.LogWarning($"Sound '{name}' not found!");
+        }
+    }
+
+    public void PlayMusic(string name)
+    {
+        if (soundDict.TryGetValue(name, out Sound sound))
+        {
+            musicSource.clip = sound.clip;
+            musicSource.volume = sound.volume * musicVolume * masterVolume;
+            musicSource.loop = true;
+            musicSource.Play();
+        }
+    }
+
+    public void StopMusic()
+    {
+        musicSource.Stop();
+    }
+
+    public void SetMasterVolume(float volume)
+    {
+        masterVolume = Mathf.Clamp01(volume);
+        UpdateAllVolumes();
+    }
+
+    public void SetSFXVolume(float volume)
+    {
+        sfxVolume = Mathf.Clamp01(volume);
+        UpdateAllVolumes();
+    }
+
+    public void SetMusicVolume(float volume)
+    {
+        musicVolume = Mathf.Clamp01(volume);
+        if (musicSource != null)
+            musicSource.volume = musicVolume * masterVolume;
+    }
+
+    public void SetMute(bool mute)
+    {
+        isMuted = mute;
+        AudioListener.pause = mute;
+    }
+
+    private void UpdateAllVolumes()
+    {
+        foreach (var sound in soundDict.Values)
+        {
+            if (sound.source != null)
+            {
+                sound.source.volume = sound.volume * sfxVolume * masterVolume;
+            }
+        }
+
+        if (musicSource != null)
+            musicSource.volume = musicVolume * masterVolume;
+    }
+
+    public bool IsMuted() => isMuted;
 }

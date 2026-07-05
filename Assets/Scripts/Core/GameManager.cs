@@ -1,62 +1,127 @@
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
-public class CameraController : MonoBehaviour
+public class GameManager : MonoBehaviour
 {
-    [Header("Settings")]
-    [SerializeField] private Transform target;
-    [SerializeField] private float smoothSpeed = 0.125f;
-    [SerializeField] private Vector3 offset = new Vector3(0, 0, -10);
-    [SerializeField] private bool useBounds = true;
-    [SerializeField] private Bounds levelBounds;
+    private static GameManager instance;
+    public static GameManager Instance => instance;
 
-    private void FixedUpdate()
+    [Header("Game Settings")]
+    [SerializeField] private int currentLevel = 0;
+    [SerializeField] private int totalLevels = 3;
+    [SerializeField] private GameObject gameOverUI;
+    [SerializeField] private GameObject victoryUI;
+
+    private Vector3 lastCheckpoint;
+    private bool isGameOver = false;
+    private bool isPaused = false;
+
+    private void Awake()
     {
-        if (target == null) return;
-
-        Vector3 desiredPosition = target.position + offset;
-
-        if (useBounds)
+        if (instance == null)
         {
-            desiredPosition.x = Mathf.Clamp(
-                desiredPosition.x,
-                levelBounds.min.x,
-                levelBounds.max.x
-            );
-            desiredPosition.y = Mathf.Clamp(
-                desiredPosition.y,
-                levelBounds.min.y,
-                levelBounds.max.y
-            );
+            instance = this;
+            DontDestroyOnLoad(gameObject);
+        }
+        else
+        {
+            Destroy(gameObject);
         }
 
-        Vector3 smoothedPosition = Vector3.Lerp(
-            transform.position,
-            desiredPosition,
-            smoothSpeed
-        );
-        transform.position = smoothedPosition;
+        // مخفی کردن UIهای اولیه
+        if (gameOverUI != null) gameOverUI.SetActive(false);
+        if (victoryUI != null) victoryUI.SetActive(false);
     }
 
-    public void SetTarget(Transform newTarget)
+    private void Start()
     {
-        target = newTarget;
+        // شروع از چک‌پوینت اولیه (ابتدای مرحله)
+        lastCheckpoint = Vector3.zero;
     }
 
-    public void SetBounds(Bounds newBounds)
+    public void GameOver()
     {
-        levelBounds = newBounds;
-        useBounds = true;
+        if (isGameOver) return;
+
+        isGameOver = true;
+        Time.timeScale = 0f;
+
+        if (gameOverUI != null)
+            gameOverUI.SetActive(true);
+
+        AudioManager.Instance?.PlaySFX("GameOver");
+        Debug.Log("Game Over!");
     }
 
-    private void OnDrawGizmos()
+    public void RestartFromCheckpoint()
     {
-        if (useBounds)
+        isGameOver = false;
+        Time.timeScale = 1f;
+
+        if (gameOverUI != null)
+            gameOverUI.SetActive(false);
+
+        // پیدا کردن بازیکن و انتقال به چک‌پوینت
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
         {
-            Gizmos.color = Color.yellow;
-            Gizmos.DrawWireCube(
-                levelBounds.center,
-                levelBounds.size
-            );
+            player.transform.position = lastCheckpoint;
+            // تنظیم مجدد وضعیت
+            player.GetComponent<PlayerState>()?.gameObject.SetActive(true);
         }
+
+        Debug.Log($"Restarted from checkpoint: {lastCheckpoint}");
+    }
+
+    public void RestartLevel()
+    {
+        isGameOver = false;
+        Time.timeScale = 1f;
+        SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+    }
+
+    public void LoadLevel(int levelIndex)
+    {
+        currentLevel = levelIndex;
+        SceneManager.LoadScene($"Level{levelIndex + 1}");
+    }
+
+    public void NextLevel()
+    {
+        currentLevel++;
+        if (currentLevel >= totalLevels)
+        {
+            Victory();
+        }
+        else
+        {
+            LoadLevel(currentLevel);
+        }
+    }
+
+    public void Victory()
+    {
+        Time.timeScale = 0f;
+        if (victoryUI != null)
+            victoryUI.SetActive(true);
+
+        AudioManager.Instance?.PlaySFX("Victory");
+        Debug.Log("Congratulations! You completed the game!");
+    }
+
+    public void SetCheckpoint(Vector2 position)
+    {
+        lastCheckpoint = position;
+        Debug.Log($"Checkpoint set at: {position}");
+    }
+
+    public Vector3 GetLastCheckpoint() => lastCheckpoint;
+    public bool IsGameOver() => isGameOver;
+    public bool IsPaused() => isPaused;
+
+    public void TogglePause()
+    {
+        isPaused = !isPaused;
+        Time.timeScale = isPaused ? 0f : 1f;
     }
 }
