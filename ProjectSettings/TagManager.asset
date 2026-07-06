@@ -13,14 +13,14 @@ TagManager:
   - UI
   - 
   - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Player
+  - Shadow
+  - Enemy
+  - Ground
+  - Platform
+  - Obstacle
+  - Door
+  - PressurePlate
   - 
   - 
   - 
