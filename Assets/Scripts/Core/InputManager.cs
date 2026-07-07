@@ -24,36 +24,43 @@ public class InputManager : MonoBehaviour
 
     private void OnEnable()
     {
-        Controls.Enable();
+        if (Controls != null)
+            Controls.Enable();
     }
 
     private void OnDisable()
     {
-        Controls.Disable();
+        if (Controls != null)
+            Controls.Disable();
     }
 
     public Vector2 GetMoveInput()
     {
+        if (Controls == null) return Vector2.zero;
         return Controls.Gameplay.Move.ReadValue<Vector2>();
     }
 
     public bool GetJumpPressed()
     {
+        if (Controls == null) return false;
         return Controls.Gameplay.Jump.triggered;
     }
 
     public bool GetSwitchPressed()
     {
+        if (Controls == null) return false;
         return Controls.Gameplay.SwitchMode.triggered;
     }
 
     public bool GetTeleportPressed()
     {
+        if (Controls == null) return false;
         return Controls.Gameplay.Teleport.triggered;
     }
 
     public Vector2 GetTeleportDirection()
     {
+        if (Controls == null) return Vector2.zero;
         return Controls.Gameplay.TeleportDirection.ReadValue<Vector2>();
     }
 }
