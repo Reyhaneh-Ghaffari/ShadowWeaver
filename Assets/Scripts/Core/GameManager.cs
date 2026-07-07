@@ -1,6 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using TMPro;  // ← این رو اضافه کن
+using TMPro;
 
 public class GameManager : MonoBehaviour
 {
@@ -13,6 +13,9 @@ public class GameManager : MonoBehaviour
 
     private Vector3 lastCheckpoint;
     private bool isGameOver = false;
+
+    // ===== این خط رو اضافه کن =====
+    private TextMeshProUGUI gameOverText;
 
     private void Awake()
     {
@@ -30,6 +33,14 @@ public class GameManager : MonoBehaviour
     private void Start()
     {
         lastCheckpoint = new Vector3(-7f, -2.5f, 0f);
+
+        // ===== پیدا کردن GameOverText =====
+        gameOverText = GameObject.Find("GameOverText")?.GetComponent<TextMeshProUGUI>();
+        if (gameOverText != null)
+        {
+            gameOverText.gameObject.SetActive(false);
+        }
+
         Debug.Log($"📍 Initial checkpoint set at: {lastCheckpoint}");
     }
 
@@ -76,24 +87,30 @@ public class GameManager : MonoBehaviour
         Invoke(nameof(RestartFromCheckpoint), 2f);
     }
 
+    // ===== این متد رو اضافه کن =====
     private void ShowGameOverMessage()
     {
-        // پیدا کردن TutorialText
-        TextMeshProUGUI text = FindObjectOfType<TextMeshProUGUI>();
-        if (text != null)
+        Debug.Log("💀 ===== GAME OVER MESSAGE ===== 💀");
+
+        if (gameOverText != null)
         {
-            text.text = "💀 Game Over! Restarting...";
-            text.gameObject.SetActive(true);
-            Invoke(nameof(HideMessage), 2f);
+            gameOverText.text = "Game Over! Restarting...";
+            gameOverText.gameObject.SetActive(true);
+            Invoke(nameof(HideGameOverMessage), 2f);
+        }
+        else
+        {
+            // اگه GameOverText پیدا نشد، از UIManager استفاده کن
+            UIManager.Instance?.ShowMessage("💀 Game Over! Restarting...", 2f);
         }
     }
 
-    private void HideMessage()
+    // ===== این متد رو اضافه کن =====
+    private void HideGameOverMessage()
     {
-        TextMeshProUGUI text = FindObjectOfType<TextMeshProUGUI>();
-        if (text != null)
+        if (gameOverText != null)
         {
-            text.gameObject.SetActive(false);
+            gameOverText.gameObject.SetActive(false);
         }
     }
 
@@ -120,6 +137,12 @@ public class GameManager : MonoBehaviour
             {
                 pc.SetActive(true);
             }
+        }
+        else
+        {
+            Debug.LogError("❌ Player not found!");
+            RestartLevel();
+            return;
         }
 
         GameObject shadow = GameObject.FindGameObjectWithTag("Shadow");
@@ -156,11 +179,12 @@ public class GameManager : MonoBehaviour
     public Vector3 GetLastCheckpoint() => lastCheckpoint;
     public bool IsGameOver() => isGameOver;
 
-    // برای تست - کلید G
+    // ===== برای تست - کلید G =====
     private void Update()
     {
         if (Input.GetKeyDown(KeyCode.G))
         {
+            Debug.Log("🔴 Test GameOver triggered by G key!");
             GameOver();
         }
     }
