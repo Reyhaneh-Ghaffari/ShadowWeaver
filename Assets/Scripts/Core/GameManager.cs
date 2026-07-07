@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
+using TMPro;  // ← این رو اضافه کن
 
 public class GameManager : MonoBehaviour
 {
@@ -9,12 +10,9 @@ public class GameManager : MonoBehaviour
     [Header("Game Settings")]
     [SerializeField] private int currentLevel = 0;
     [SerializeField] private int totalLevels = 3;
-    [SerializeField] private GameObject gameOverUI;
-    [SerializeField] private GameObject victoryUI;
 
     private Vector3 lastCheckpoint;
     private bool isGameOver = false;
-    private bool isPaused = false;
 
     private void Awake()
     {
@@ -27,16 +25,12 @@ public class GameManager : MonoBehaviour
         {
             Destroy(gameObject);
         }
-
-        // مخفی کردن UIهای اولیه
-        if (gameOverUI != null) gameOverUI.SetActive(false);
-        if (victoryUI != null) victoryUI.SetActive(false);
     }
 
     private void Start()
     {
-        // شروع از چک‌پوینت اولیه (ابتدای مرحله)
-        lastCheckpoint = Vector3.zero;
+        lastCheckpoint = new Vector3(-7f, -2.5f, 0f);
+        Debug.Log($"📍 Initial checkpoint set at: {lastCheckpoint}");
     }
 
     public void GameOver()
@@ -44,84 +38,130 @@ public class GameManager : MonoBehaviour
         if (isGameOver) return;
 
         isGameOver = true;
-        Time.timeScale = 0f;
 
-        if (gameOverUI != null)
-            gameOverUI.SetActive(true);
+        // غیرفعال کردن Player
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        if (player != null)
+        {
+            PlayerController pc = player.GetComponent<PlayerController>();
+            if (pc != null) pc.SetActive(false);
 
-        AudioManager.Instance?.PlaySFX("GameOver");
-        Debug.Log("Game Over!");
+            Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+        }
+
+        // غیرفعال کردن Shadow
+        GameObject shadow = GameObject.FindGameObjectWithTag("Shadow");
+        if (shadow != null)
+        {
+            ShadowController sc = shadow.GetComponent<ShadowController>();
+            if (sc != null)
+            {
+                Rigidbody2D rb = shadow.GetComponent<Rigidbody2D>();
+                if (rb != null)
+                {
+                    rb.velocity = Vector2.zero;
+                    rb.angularVelocity = 0f;
+                }
+            }
+        }
+
+        Debug.Log("💀 GAME OVER!");
+        ShowGameOverMessage();
+
+        Invoke(nameof(RestartFromCheckpoint), 2f);
+    }
+
+    private void ShowGameOverMessage()
+    {
+        // پیدا کردن TutorialText
+        TextMeshProUGUI text = FindObjectOfType<TextMeshProUGUI>();
+        if (text != null)
+        {
+            text.text = "💀 Game Over! Restarting...";
+            text.gameObject.SetActive(true);
+            Invoke(nameof(HideMessage), 2f);
+        }
+    }
+
+    private void HideMessage()
+    {
+        TextMeshProUGUI text = FindObjectOfType<TextMeshProUGUI>();
+        if (text != null)
+        {
+            text.gameObject.SetActive(false);
+        }
     }
 
     public void RestartFromCheckpoint()
     {
+        Debug.Log($"🔄 Restarting from checkpoint: {lastCheckpoint}");
+
         isGameOver = false;
-        Time.timeScale = 1f;
 
-        if (gameOverUI != null)
-            gameOverUI.SetActive(false);
-
-        // پیدا کردن بازیکن و انتقال به چک‌پوینت
         GameObject player = GameObject.FindGameObjectWithTag("Player");
         if (player != null)
         {
             player.transform.position = lastCheckpoint;
-            // تنظیم مجدد وضعیت
-            player.GetComponent<PlayerState>()?.gameObject.SetActive(true);
+
+            Rigidbody2D rb = player.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+
+            PlayerController pc = player.GetComponent<PlayerController>();
+            if (pc != null)
+            {
+                pc.SetActive(true);
+            }
         }
 
-        Debug.Log($"Restarted from checkpoint: {lastCheckpoint}");
+        GameObject shadow = GameObject.FindGameObjectWithTag("Shadow");
+        if (shadow != null)
+        {
+            ShadowController sc = shadow.GetComponent<ShadowController>();
+            if (sc != null && !sc.IsAttached())
+            {
+                sc.AttachToPlayer();
+            }
+
+            Rigidbody2D rb = shadow.GetComponent<Rigidbody2D>();
+            if (rb != null)
+            {
+                rb.velocity = Vector2.zero;
+                rb.angularVelocity = 0f;
+            }
+        }
     }
 
     public void RestartLevel()
     {
         isGameOver = false;
-        Time.timeScale = 1f;
         SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
-    }
-
-    public void LoadLevel(int levelIndex)
-    {
-        currentLevel = levelIndex;
-        SceneManager.LoadScene($"Level{levelIndex + 1}");
-    }
-
-    public void NextLevel()
-    {
-        currentLevel++;
-        if (currentLevel >= totalLevels)
-        {
-            Victory();
-        }
-        else
-        {
-            LoadLevel(currentLevel);
-        }
-    }
-
-    public void Victory()
-    {
-        Time.timeScale = 0f;
-        if (victoryUI != null)
-            victoryUI.SetActive(true);
-
-        AudioManager.Instance?.PlaySFX("Victory");
-        Debug.Log("Congratulations! You completed the game!");
+        Debug.Log("🔄 Level restarted from beginning!");
     }
 
     public void SetCheckpoint(Vector2 position)
     {
         lastCheckpoint = position;
-        Debug.Log($"Checkpoint set at: {position}");
+        Debug.Log($"📍 Checkpoint set at: {position}");
     }
 
     public Vector3 GetLastCheckpoint() => lastCheckpoint;
     public bool IsGameOver() => isGameOver;
-    public bool IsPaused() => isPaused;
 
-    public void TogglePause()
+    // برای تست - کلید G
+    private void Update()
     {
-        isPaused = !isPaused;
-        Time.timeScale = isPaused ? 0f : 1f;
+        if (Input.GetKeyDown(KeyCode.G))
+        {
+            GameOver();
+        }
     }
 }
