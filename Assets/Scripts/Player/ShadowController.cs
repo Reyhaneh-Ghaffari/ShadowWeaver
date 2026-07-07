@@ -10,12 +10,10 @@ public class ShadowController : MonoBehaviour
     [Header("References")]
     [SerializeField] private Rigidbody2D rb;
     [SerializeField] private SpriteRenderer spriteRenderer;
-    [SerializeField] private GameObject shadowVisual;
-    [SerializeField] private GameObject lightVisual;
 
     private Vector2 moveInput;
     private int jumpCount = 0;
-    private const int MAX_JUMPS = 3; // Shadow can dash three times.
+    private const int MAX_JUMPS = 3;
     private bool isGrounded;
     private bool isAttached = true;
 
@@ -23,20 +21,26 @@ public class ShadowController : MonoBehaviour
 
     private void Awake()
     {
-        rb = GetComponent<Rigidbody2D>();
-        spriteRenderer = GetComponent<SpriteRenderer>();
+        if (rb == null) rb = GetComponent<Rigidbody2D>();
+        if (spriteRenderer == null) spriteRenderer = GetComponent<SpriteRenderer>();
         playerTransform = GameObject.FindGameObjectWithTag("Player")?.transform;
+        Debug.Log("ShadowController Awake!");
     }
 
     private void Start()
     {
-        // The shadow is initially on the character.
         AttachToPlayer();
     }
 
     private void Update()
     {
         CheckGrounded();
+
+        // برای دیباگ: وضعیت سایه رو چاپ کن
+        if (!isAttached && moveInput.x != 0)
+        {
+            Debug.Log($"Shadow Update - Moving: {moveInput.x}");
+        }
     }
 
     private void FixedUpdate()
@@ -49,86 +53,126 @@ public class ShadowController : MonoBehaviour
 
     public void DetachFromPlayer()
     {
+        if (playerTransform == null)
+        {
+            Debug.LogError("Player Transform is null!");
+            return;
+        }
+
         isAttached = false;
         transform.parent = null;
-        rb.isKinematic = false;
 
-        // Position the shadow exactly where the character is.
+        if (rb != null)
+        {
+            rb.isKinematic = false;
+            rb.bodyType = RigidbodyType2D.Dynamic;
+        }
+
         transform.position = playerTransform.position;
 
-        // Enable shadow physics
-        rb.bodyType = RigidbodyType2D.Dynamic;
-
-        // Change shadow layer to pass through specific obstacles
+        // سایه با Obstacle برخورد کنه (نتونه ازش رد بشه)
         gameObject.layer = LayerMask.NameToLayer("Shadow");
 
-        // Show shadow and hide object
-        shadowVisual.SetActive(true);
-        lightVisual.SetActive(false);
+        Debug.Log("Shadow detached!");
     }
 
     public void AttachToPlayer()
     {
+        if (playerTransform == null)
+        {
+            Debug.LogError("Player Transform is null!");
+            return;
+        }
+
         isAttached = true;
         transform.parent = playerTransform;
         transform.localPosition = Vector3.zero;
-        rb.isKinematic = true;
-        rb.bodyType = RigidbodyType2D.Kinematic;
 
-        // Hide shadow when attached to the body
-        shadowVisual.SetActive(false);
-        lightVisual.SetActive(true);
+        if (rb != null)
+        {
+            rb.isKinematic = true;
+            rb.bodyType = RigidbodyType2D.Kinematic;
+        }
+
+        Debug.Log("Shadow attached!");
     }
 
-    public void Move()
+    public void SetMoveInput(Vector2 input)
     {
-        float moveX = moveInput.x * moveSpeed;
-        rb.velocity = new Vector2(moveX, rb.velocity.y);
-
-        if (moveX > 0.1f) spriteRenderer.flipX = false;
-        else if (moveX < -0.1f) spriteRenderer.flipX = true;
+        moveInput = input;
+        Debug.Log($"Shadow SetMoveInput: {input}");
     }
 
     public void Jump()
     {
+        Debug.Log($"Shadow Jump called - isAttached: {isAttached}, rb: {rb != null}");
+
+        if (rb == null || isAttached)
+        {
+            Debug.Log("Shadow Jump - blocked (attached or no rb)");
+            return;
+        }
+
         if (jumpCount < MAX_JUMPS)
         {
             rb.velocity = new Vector2(rb.velocity.x, jumpForce);
             jumpCount++;
-            AudioManager.Instance?.PlaySFX("ShadowJump");
+            Debug.Log($"Shadow Jump! Count: {jumpCount}");
+        }
+        else
+        {
+            Debug.Log($"Shadow Jump - max jumps reached ({MAX_JUMPS})");
         }
     }
 
     public void Teleport(Vector2 direction)
     {
-        // Casting a shadow towards the platform
-        RaycastHit2D hit = Physics2D.Raycast(
-            transform.position,
-            direction,
-            teleportDistance,
-            LayerMask.GetMask("Platform")
-        );
+        Debug.Log($"Teleport called - isAttached: {isAttached}, direction: {direction}");
 
-        if (hit.collider != null)
+        if (rb == null || isAttached)
         {
-            transform.position = hit.point + Vector2.up * 0.5f;
-            AudioManager.Instance?.PlaySFX("ShadowTeleport");
+            Debug.Log("Teleport blocked (attached or no rb)");
+            return;
+        }
+
+        Vector2 newPos = (Vector2)transform.position + direction * teleportDistance;
+        transform.position = newPos;
+        Debug.Log($"Teleported to: {newPos}");
+    }
+
+    private void Move()
+    {
+        if (rb == null || isAttached) return;
+
+        float moveX = moveInput.x * moveSpeed;
+        rb.velocity = new Vector2(moveX, rb.velocity.y);
+
+        if (spriteRenderer != null)
+        {
+            if (moveX > 0.1f) spriteRenderer.flipX = false;
+            else if (moveX < -0.1f) spriteRenderer.flipX = true;
         }
     }
 
     private void CheckGrounded()
     {
-        Collider2D[] colliders = Physics2D.OverlapCircleAll(
-            transform.position + Vector3.down * 0.5f,
-            0.2f,
-            LayerMask.GetMask("Ground", "Platform")
-        );
-        isGrounded = colliders.Length > 0;
+        if (rb == null) return;
 
-        if (isGrounded) jumpCount = 0;
+        RaycastHit2D hit = Physics2D.Raycast(
+            transform.position + Vector3.down * 0.6f,
+            Vector2.down,
+            0.2f,
+            LayerMask.GetMask("Ground")
+        );
+
+        bool wasGrounded = isGrounded;
+        isGrounded = hit.collider != null;
+
+        if (isGrounded && !wasGrounded)
+        {
+            jumpCount = 0;
+        }
     }
 
-    public void SetMoveInput(Vector2 input) => moveInput = input;
     public bool IsAttached() => isAttached;
-    public bool IsGrounded() => isGrounded;
 }
