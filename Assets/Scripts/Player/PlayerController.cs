@@ -12,13 +12,22 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private Rigidbody2D rb;
     [SerializeField] private SpriteRenderer spriteRenderer;
 
+    [Header("Shield Skill")]
+    [SerializeField] private GameObject shieldVisual;  // المان گرافیکی Shield
+    [SerializeField] private float shieldDuration = 5f; // مدت زمان محافظت (اختیاری)
+
     private Vector2 moveInput;
     private bool isGrounded;
     private int jumpCount = 0;
     private const int MAX_JUMPS = 2;
-
-    // برای دیباگ
     private bool isPlayerActive = true;
+
+    // ===== متغیرهای Shield =====
+    private bool hasShield = false;
+    private float shieldTimer = 0f;
+
+    private float footstepTimer = 0f;
+    private const float FOOTSTEP_INTERVAL = 0.3f;
 
     private void Awake()
     {
@@ -32,46 +41,40 @@ public class PlayerController : MonoBehaviour
             go.transform.localPosition = new Vector3(0, -0.85f, 0);
             groundCheckPoint = go.transform;
         }
+
+        // مخفی کردن Shield در ابتدا
+        if (shieldVisual != null)
+            shieldVisual.SetActive(false);
     }
 
     private void Update()
     {
-        if (!isPlayerActive) return;
+        if (!isPlayerActive || rb == null) return;
 
         CheckGrounded();
 
-        // ===== ورودی با کیبورد =====
         float horizontal = 0f;
         if (Input.GetKey(KeyCode.A)) horizontal = -1f;
         if (Input.GetKey(KeyCode.D)) horizontal = 1f;
         moveInput = new Vector2(horizontal, 0f);
 
-        // پرش
         if (Input.GetKeyDown(KeyCode.Space))
         {
-            Debug.Log($"Space pressed! JumpCount: {jumpCount}, isGrounded: {isGrounded}, MAX: {MAX_JUMPS}");
             TryJump();
         }
 
-        // برای دیباگ - هر ثانیه یک بار وضعیت رو چاپ کن
-        if (Time.frameCount % 60 == 0)
-        {
-            Debug.Log($"Status - isGrounded: {isGrounded}, jumpCount: {jumpCount}, isActive: {isPlayerActive}");
-        }
-
-
+        HandleFootstep();
+        UpdateShieldTimer();
     }
 
     private void FixedUpdate()
     {
-        if (!isPlayerActive) return;
+        if (!isPlayerActive || rb == null) return;
         Move();
     }
 
     private void Move()
     {
-        if (rb == null) return;
-
         float moveX = moveInput.x * moveSpeed;
         rb.velocity = new Vector2(moveX, rb.velocity.y);
 
@@ -84,15 +87,13 @@ public class PlayerController : MonoBehaviour
 
     private void TryJump()
     {
+        if (rb == null) return;
+
         if (jumpCount < MAX_JUMPS)
         {
             rb.velocity = new Vector2(rb.velocity.x, jumpForce);
             jumpCount++;
-            Debug.Log($"✅ Jump! Count: {jumpCount}");
-        }
-        else
-        {
-            Debug.Log($"❌ Can't jump! Max jumps reached: {MAX_JUMPS}");
+            AudioManager.Instance?.PlaySFX("Jump");
         }
     }
 
@@ -113,25 +114,79 @@ public class PlayerController : MonoBehaviour
         if (isGrounded && !wasGrounded)
         {
             jumpCount = 0;
-            Debug.Log("🟢 Landed! Jump reset.");
         }
     }
 
-    // ===== متدهای کنترل فعال/غیرفعال =====
+    private void HandleFootstep()
+    {
+        bool isMoving = Mathf.Abs(moveInput.x) > 0.1f;
+
+        if (isMoving && isGrounded && isPlayerActive)
+        {
+            footstepTimer -= Time.deltaTime;
+            if (footstepTimer <= 0f)
+            {
+                AudioManager.Instance?.PlaySFX("Footstep");
+                footstepTimer = FOOTSTEP_INTERVAL;
+            }
+        }
+        else
+        {
+            footstepTimer = 0f;
+        }
+    }
+
+    // ===== متدهای Shield =====
+    public void ActivateShield()
+    {
+        hasShield = true;
+        shieldTimer = shieldDuration;
+
+        if (shieldVisual != null)
+            shieldVisual.SetActive(true);
+
+        Debug.Log("🛡️ Shield Activated!");
+    }
+
+    public bool HasShield()
+    {
+        return hasShield;
+    }
+
+    public void UseShield()
+    {
+        if (hasShield)
+        {
+            hasShield = false;
+            if (shieldVisual != null)
+                shieldVisual.SetActive(false);
+
+            Debug.Log("🛡️ Shield Used!");
+        }
+    }
+
+    private void UpdateShieldTimer()
+    {
+        if (hasShield)
+        {
+            shieldTimer -= Time.deltaTime;
+            if (shieldTimer <= 0f)
+            {
+                hasShield = false;
+                if (shieldVisual != null)
+                    shieldVisual.SetActive(false);
+                Debug.Log("🛡️ Shield Expired!");
+            }
+        }
+    }
+
     public void SetActive(bool active)
     {
         isPlayerActive = active;
-        if (!active)
+        if (!active && rb != null)
         {
-            if (rb != null)
-            {
-                rb.velocity = Vector2.zero;
-                rb.angularVelocity = 0f;
-            }
-            // غیرفعال کردن ورودی
-            moveInput = Vector2.zero;
+            rb.velocity = Vector2.zero;
         }
-        Debug.Log($"PlayerController set to: {active}");
     }
 
     public bool IsActive() => isPlayerActive;
