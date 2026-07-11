@@ -11,7 +11,7 @@ public class TutorialMessage : MonoBehaviour
     [SerializeField] private TextMeshProUGUI messageDisplay;
 
     [Header("Animation Settings")]
-    [SerializeField] private float fadeSpeed = 2f;
+    //[SerializeField] private float fadeSpeed = 2f;
     [SerializeField] private bool useFadeAnimation = true;
 
     private CanvasGroup canvasGroup;

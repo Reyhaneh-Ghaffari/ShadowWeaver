@@ -3,10 +3,8 @@ using UnityEngine.Events;
 
 public class PressurePlate : MonoBehaviour
 {
-    [Header("Settings")]
+    [Header("Plate Settings")]
     [SerializeField] private bool requireLightMode = true;
-    [SerializeField] private bool requireShadowMode = false;
-    [SerializeField] private float activationDelay = 0.5f;
     [SerializeField] private Sprite pressedSprite;
     [SerializeField] private Sprite unpressedSprite;
 
@@ -17,41 +15,50 @@ public class PressurePlate : MonoBehaviour
     private SpriteRenderer spriteRenderer;
     private bool isActivated = false;
     private int objectsOnPlate = 0;
+    private Collider2D plateCollider;
 
     private void Awake()
     {
         spriteRenderer = GetComponent<SpriteRenderer>();
-        if (spriteRenderer == null) spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+        if (spriteRenderer == null)
+            spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+
+        plateCollider = GetComponent<Collider2D>();
+        if (plateCollider == null)
+            plateCollider = gameObject.AddComponent<BoxCollider2D>();
+
+        if (plateCollider != null)
+            plateCollider.isTrigger = true;
+
         UpdateSprite(false);
     }
 
     private void OnTriggerEnter2D(Collider2D other)
     {
-        if (other.CompareTag("Player") || other.CompareTag("Shadow"))
+        Debug.Log($"Trigger entered by: {other.gameObject.name} with tag: {other.tag}");
+
+        if (other.CompareTag("Player"))
         {
-            // چک کردن حالت مورد نیاز
             PlayerState playerState = other.GetComponent<PlayerState>();
-            if (playerState != null)
-            {
-                bool isShadow = playerState.IsInShadowMode();
 
-                if (requireLightMode && isShadow) return;
-                if (requireShadowMode && !isShadow) return;
-            }
-
-            objectsOnPlate++;
-            if (objectsOnPlate >= 1 && !isActivated)
+            if (requireLightMode && playerState != null && !playerState.IsInShadowMode())
             {
-                ActivatePlate();
+                objectsOnPlate++;
+                Debug.Log($"Objects on plate: {objectsOnPlate}");
+                if (objectsOnPlate >= 1 && !isActivated)
+                {
+                    ActivatePlate();
+                }
             }
         }
     }
 
     private void OnTriggerExit2D(Collider2D other)
     {
-        if (other.CompareTag("Player") || other.CompareTag("Shadow"))
+        if (other.CompareTag("Player"))
         {
             objectsOnPlate--;
+            Debug.Log($"Objects on plate: {objectsOnPlate}");
             if (objectsOnPlate <= 0 && isActivated)
             {
                 DeactivatePlate();
@@ -64,7 +71,6 @@ public class PressurePlate : MonoBehaviour
         isActivated = true;
         UpdateSprite(true);
         OnActivated?.Invoke();
-        AudioManager.Instance?.PlaySFX("PlateActivate");
         Debug.Log("Pressure Plate Activated!");
     }
 
@@ -73,16 +79,35 @@ public class PressurePlate : MonoBehaviour
         isActivated = false;
         UpdateSprite(false);
         OnDeactivated?.Invoke();
-        AudioManager.Instance?.PlaySFX("PlateDeactivate");
         Debug.Log("Pressure Plate Deactivated!");
     }
 
     private void UpdateSprite(bool pressed)
     {
-        if (pressed && pressedSprite != null)
-            spriteRenderer.sprite = pressedSprite;
-        else if (!pressed && unpressedSprite != null)
-            spriteRenderer.sprite = unpressedSprite;
+        if (spriteRenderer != null)
+        {
+            spriteRenderer.sprite = pressed ? pressedSprite : unpressedSprite;
+        }
+    }
+
+    public void ForceReset()
+    {
+        // ریست کامل
+        isActivated = false;
+        objectsOnPlate = 0;
+        UpdateSprite(false);
+
+        // Deactivate رو صدا بزن تا درها بسته بشن
+        OnDeactivated?.Invoke();
+
+        // اطمینان از اینکه Collider فعال هست
+        if (plateCollider != null)
+        {
+            plateCollider.enabled = true;
+            plateCollider.isTrigger = true;
+        }
+
+        Debug.Log("Pressure Plate Force Reset!");
     }
 
     public bool IsActivated() => isActivated;

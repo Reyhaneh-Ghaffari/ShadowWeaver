@@ -4,10 +4,12 @@ public class DoorController : MonoBehaviour
 {
     [Header("Door Settings")]
     [SerializeField] private PressurePlate requiredPlate;
-    [SerializeField] private bool startOpen = false;
     [SerializeField] private float openSpeed = 2f;
     [SerializeField] private Vector2 openOffset = new Vector2(0, 3f);
     [SerializeField] private bool allowShadowPass = true;
+
+    [Header("References")]
+    [SerializeField] private Collider2D doorCollider;  // ← Collider درب
 
     private Vector2 closedPosition;
     private Vector2 openPosition;
@@ -18,9 +20,11 @@ public class DoorController : MonoBehaviour
     {
         closedPosition = transform.position;
         openPosition = closedPosition + openOffset;
+        transform.position = closedPosition;
 
-        isOpen = startOpen;
-        transform.position = startOpen ? openPosition : closedPosition;
+        // پیدا کردن Collider درب
+        if (doorCollider == null)
+            doorCollider = GetComponent<Collider2D>();
 
         if (requiredPlate != null)
         {
@@ -49,8 +53,12 @@ public class DoorController : MonoBehaviour
         {
             isOpen = true;
             isMoving = true;
-            AudioManager.Instance?.PlaySFX("DoorOpen");
-            Debug.Log("Door Opened!");
+
+            // ===== غیرفعال کردن Collider درب =====
+            if (doorCollider != null)
+                doorCollider.enabled = false;
+
+            Debug.Log(" Door Opened! Collider disabled.");
         }
     }
 
@@ -60,8 +68,12 @@ public class DoorController : MonoBehaviour
         {
             isOpen = false;
             isMoving = true;
-            AudioManager.Instance?.PlaySFX("DoorClose");
-            Debug.Log("Door Closed!");
+
+            // ===== فعال کردن Collider درب =====
+            if (doorCollider != null)
+                doorCollider.enabled = true;
+
+            Debug.Log(" Door Closed! Collider enabled.");
         }
     }
 
@@ -69,14 +81,18 @@ public class DoorController : MonoBehaviour
     {
         if (isOpen && other.CompareTag("Shadow") && allowShadowPass)
         {
-            // سایه می‌تونه از در رد بشه
-            Debug.Log("Shadow passed through door!");
+            Debug.Log(" Shadow passed through the door!");
+            // اینجا میتونی مرحله بعد رو صدا بزنی
         }
         else if (!isOpen && other.CompareTag("Player"))
         {
-            // جسم نمی‌تونه از در بسته رد بشه
-            // می‌تونیم اینجا یه پیام نشون بدیم
-            UIManager.Instance?.ShowMessage("You need to activate the pressure plate first!");
+            Debug.Log(" Door is closed!");
+            UIManager.Instance?.ShowMessage(" Stand on the pressure plate to open the door!", 2f);
+        }
+        else if (!isOpen && other.CompareTag("Shadow"))
+        {
+            Debug.Log("Shadow cannot pass! Door is closed.");
+            UIManager.Instance?.ShowMessage(" Switch to Light mode and stand on the plate!", 2f);
         }
     }
 

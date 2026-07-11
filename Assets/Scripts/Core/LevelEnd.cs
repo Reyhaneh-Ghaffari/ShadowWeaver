@@ -6,7 +6,7 @@ public class LevelEnd : MonoBehaviour
     [Header("Level Settings")]
     [SerializeField] private string nextLevelName = "Level2";
     [SerializeField] private float delayBeforeLoad = 1.5f;
-    [SerializeField] private string completeMessage = "🎉 Level Complete!";
+    [SerializeField] private string completeMessage = "Level Complete!";
 
     private bool isComplete = false;
 
@@ -14,7 +14,7 @@ public class LevelEnd : MonoBehaviour
     {
         if (isComplete) return;
 
-        Debug.Log($"🚪 Gate triggered by: {other.gameObject.name} with tag: {other.tag}");
+        Debug.Log($"Gate triggered by: {other.gameObject.name} with tag: {other.tag}");
 
         // فقط Player میتونه از در عبور کنه
         if (other.CompareTag("Player"))
@@ -23,7 +23,7 @@ public class LevelEnd : MonoBehaviour
         }
         else if (other.CompareTag("Shadow"))
         {
-            Debug.Log("🚫 Shadow cannot pass through the gate!");
+            Debug.Log("Shadow cannot pass through the gate!");
             UIManager.Instance?.ShowMessage("Switch to Light Mode to pass!", 2f);
         }
     }
@@ -31,7 +31,7 @@ public class LevelEnd : MonoBehaviour
     private void CompleteLevel()
     {
         isComplete = true;
-        Debug.Log($"🎉 {completeMessage}");
+        Debug.Log($" {completeMessage}");
 
         // نمایش پیغام
         UIManager.Instance?.ShowMessage(completeMessage, 2f);
@@ -45,7 +45,7 @@ public class LevelEnd : MonoBehaviour
 
     private void LoadNextLevel()
     {
-        Debug.Log($"🔄 Loading next level: {nextLevelName}");
+        Debug.Log($"Loading next level: {nextLevelName}");
         SceneManager.LoadScene(nextLevelName);
     }
 

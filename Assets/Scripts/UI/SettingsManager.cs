@@ -1,32 +1,17 @@
 using UnityEngine;
 using UnityEngine.UI;
-using System.IO;
+using TMPro;
 
 public class SettingsManager : MonoBehaviour
 {
     private static SettingsManager instance;
     public static SettingsManager Instance => instance;
 
-    [System.Serializable]
-    public class GameSettings
-    {
-        public float masterVolume = 1f;
-        public float sfxVolume = 1f;
-        public float musicVolume = 1f;
-        public bool isMuted = false;
-        public int qualityLevel = 2;
-        public bool showFPS = false;
-    }
-
-    [Header("UI")]
-    [SerializeField] private Slider masterSlider;
-    [SerializeField] private Slider sfxSlider;
-    [SerializeField] private Slider musicSlider;
-    [SerializeField] private Toggle muteToggle;
+    [Header("UI References")]
     [SerializeField] private GameObject settingsPanel;
-
-    private GameSettings settings = new GameSettings();
-    private string settingsPath;
+    [SerializeField] private Toggle musicToggle;
+    [SerializeField] private Toggle sfxToggle;
+    [SerializeField] private Slider masterVolumeSlider;
 
     private void Awake()
     {
@@ -40,125 +25,113 @@ public class SettingsManager : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+    }
 
-        settingsPath = Path.Combine(Application.persistentDataPath, "settings.json");
-        LoadSettings();
-        ApplySettings();
+    private void Start()
+    {
+        // پنهان کردن پنل تنظیمات در ابتدا
+        if (settingsPanel != null)
+            settingsPanel.SetActive(false);
 
-        // اتصال به UI
-        if (masterSlider != null)
+        // بارگذاری تنظیمات ذخیره شده
+        LoadAndApplySettings();
+
+        // تنظیم رویدادها
+        SetupUIEvents();
+    }
+
+    private void SetupUIEvents()
+    {
+        if (musicToggle != null)
         {
-            masterSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
-            masterSlider.value = settings.masterVolume;
-        }
-        if (sfxSlider != null)
-        {
-            sfxSlider.onValueChanged.AddListener(OnSFXVolumeChanged);
-            sfxSlider.value = settings.sfxVolume;
-        }
-        if (musicSlider != null)
-        {
-            musicSlider.onValueChanged.AddListener(OnMusicVolumeChanged);
-            musicSlider.value = settings.musicVolume;
-        }
-        if (muteToggle != null)
-        {
-            muteToggle.onValueChanged.AddListener(OnMuteToggled);
-            muteToggle.isOn = settings.isMuted;
+            musicToggle.onValueChanged.RemoveAllListeners();
+            musicToggle.onValueChanged.AddListener(OnMusicToggleChanged);
         }
 
+        if (sfxToggle != null)
+        {
+            sfxToggle.onValueChanged.RemoveAllListeners();
+            sfxToggle.onValueChanged.AddListener(OnSFXToggleChanged);
+        }
+
+        if (masterVolumeSlider != null)
+        {
+            masterVolumeSlider.onValueChanged.RemoveAllListeners();
+            masterVolumeSlider.onValueChanged.AddListener(OnMasterVolumeChanged);
+        }
+    }
+
+    private void LoadAndApplySettings()
+    {
+        // بارگذاری از PlayerPrefs
+        bool musicOn = PlayerPrefs.GetInt("MusicEnabled", 1) == 1;
+        bool sfxOn = PlayerPrefs.GetInt("SFXEnabled", 1) == 1;
+        float masterVol = PlayerPrefs.GetFloat("MasterVolume", 1f);
+
+        // اعمال به UI
+        if (musicToggle != null)
+            musicToggle.isOn = musicOn;
+
+        if (sfxToggle != null)
+            sfxToggle.isOn = sfxOn;
+
+        if (masterVolumeSlider != null)
+            masterVolumeSlider.value = masterVol;
+
+        // اعمال به AudioManager
+        AudioManager.Instance?.SetMusicEnabled(musicOn);
+        AudioManager.Instance?.SetSFXEnabled(sfxOn);
+        AudioManager.Instance?.SetMasterVolume(masterVol);
+    }
+
+    // ===== رویدادها =====
+    public void OnMusicToggleChanged(bool isOn)
+    {
+        Debug.Log($"Music Toggle: {isOn}");
+        AudioManager.Instance?.SetMusicEnabled(isOn);
+        PlayerPrefs.SetInt("MusicEnabled", isOn ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public void OnSFXToggleChanged(bool isOn)
+    {
+        Debug.Log($"SFX Toggle: {isOn}");
+        AudioManager.Instance?.SetSFXEnabled(isOn);
+        PlayerPrefs.SetInt("SFXEnabled", isOn ? 1 : 0);
+        PlayerPrefs.Save();
+    }
+
+    public void OnMasterVolumeChanged(float value)
+    {
+        Debug.Log($"Master Volume: {value}");
+        AudioManager.Instance?.SetMasterVolume(value);
+        PlayerPrefs.SetFloat("MasterVolume", value);
+        PlayerPrefs.Save();
+    }
+
+    // ===== باز و بسته کردن پنل =====
+    public void ToggleSettingsPanel()
+    {
+        if (settingsPanel != null)
+        {
+            bool isActive = settingsPanel.activeSelf;
+            settingsPanel.SetActive(!isActive);
+            Debug.Log($"Settings Panel: {!isActive}");
+        }
+    }
+
+    public void CloseSettingsPanel()
+    {
         if (settingsPanel != null)
             settingsPanel.SetActive(false);
     }
 
-    private void OnMasterVolumeChanged(float value)
-    {
-        settings.masterVolume = value;
-        ApplySettings();
-        SaveSettings();
-        AudioManager.Instance?.SetMasterVolume(value);
-    }
-
-    private void OnSFXVolumeChanged(float value)
-    {
-        settings.sfxVolume = value;
-        ApplySettings();
-        SaveSettings();
-        AudioManager.Instance?.SetSFXVolume(value);
-    }
-
-    private void OnMusicVolumeChanged(float value)
-    {
-        settings.musicVolume = value;
-        ApplySettings();
-        SaveSettings();
-        AudioManager.Instance?.SetMusicVolume(value);
-    }
-
-    private void OnMuteToggled(bool isOn)
-    {
-        settings.isMuted = isOn;
-        ApplySettings();
-        SaveSettings();
-        AudioManager.Instance?.SetMute(isOn);
-    }
-
-    private void ApplySettings()
-    {
-        // اعمال تنظیمات به بازی
-        if (AudioManager.Instance != null)
-        {
-            AudioManager.Instance.SetMasterVolume(settings.masterVolume);
-            AudioManager.Instance.SetSFXVolume(settings.sfxVolume);
-            AudioManager.Instance.SetMusicVolume(settings.musicVolume);
-            AudioManager.Instance.SetMute(settings.isMuted);
-        }
-
-        // کیفیت گرافیک
-        QualitySettings.SetQualityLevel(settings.qualityLevel);
-    }
-
-    public void SaveSettings()
-    {
-        string json = JsonUtility.ToJson(settings, true);
-        File.WriteAllText(settingsPath, json);
-        Debug.Log($"Settings saved to: {settingsPath}");
-    }
-
-    public void LoadSettings()
-    {
-        if (File.Exists(settingsPath))
-        {
-            string json = File.ReadAllText(settingsPath);
-            JsonUtility.FromJsonOverwrite(json, settings);
-            Debug.Log($"Settings loaded from: {settingsPath}");
-        }
-        else
-        {
-            // تنظیمات پیش‌فرض
-            settings = new GameSettings();
-            SaveSettings();
-            Debug.Log("Default settings created.");
-        }
-    }
-
-    public GameSettings GetSettings() => settings;
-
-    public void ToggleSettingsPanel()
+    public void OpenSettingsPanel()
     {
         if (settingsPanel != null)
-            settingsPanel.SetActive(!settingsPanel.activeSelf);
-    }
-
-    public void ResetToDefault()
-    {
-        settings = new GameSettings();
-        ApplySettings();
-        SaveSettings();
-
-        if (masterSlider != null) masterSlider.value = settings.masterVolume;
-        if (sfxSlider != null) sfxSlider.value = settings.sfxVolume;
-        if (musicSlider != null) musicSlider.value = settings.musicVolume;
-        if (muteToggle != null) muteToggle.isOn = settings.isMuted;
+        {
+            settingsPanel.SetActive(true);
+            LoadAndApplySettings(); // بارگذاری مجدد تنظیمات
+        }
     }
 }

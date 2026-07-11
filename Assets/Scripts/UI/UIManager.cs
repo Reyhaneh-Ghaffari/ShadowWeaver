@@ -20,6 +20,7 @@ public class UIManager : MonoBehaviour
     [SerializeField] private bool showWelcomeOnStart = true;
 
     private Coroutine messageCoroutine;
+    private bool isInitialized = false;
 
     private void Awake()
     {
@@ -34,29 +35,67 @@ public class UIManager : MonoBehaviour
             return;
         }
 
-        if (tutorialText != null)
-            tutorialText.gameObject.SetActive(false);
+        InitializeUI();
+    }
 
-        if (pausePanel != null)
-            pausePanel.SetActive(false);
-        if (gameOverPanel != null)
-            gameOverPanel.SetActive(false);
-        if (victoryPanel != null)
-            victoryPanel.SetActive(false);
+    private void InitializeUI()
+    {
+        // پیدا کردن TutorialText در صحنه
+        if (tutorialText == null)
+        {
+            // روش 1: پیدا کردن با نام
+            GameObject textObj = GameObject.Find("TutorialText");
+            if (textObj != null)
+            {
+                tutorialText = textObj.GetComponent<TextMeshProUGUI>();
+                if (tutorialText != null)
+                {
+                    Debug.Log("TutorialText found by name!");
+                }
+            }
+
+            // روش 2: پیدا کردن با Tag (اگه Tag داشته باشه)
+            if (tutorialText == null)
+            {
+                TextMeshProUGUI[] allTexts = FindObjectsOfType<TextMeshProUGUI>();
+                foreach (var text in allTexts)
+                {
+                    if (text.gameObject.name == "TutorialText")
+                    {
+                        tutorialText = text;
+                        Debug.Log("TutorialText found by FindObjects!");
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (tutorialText != null)
+        {
+            tutorialText.gameObject.SetActive(false);
+            isInitialized = true;
+            Debug.Log("UIManager initialized successfully!");
+        }
+        else
+        {
+            Debug.LogWarning("TutorialText not found! UI messages will not work.");
+        }
     }
 
     private void Start()
     {
-        // نمایش پیغام Welcome در ابتدای بازی
-        if (showWelcomeOnStart)
+        if (showWelcomeOnStart && isInitialized)
         {
             ShowMessage(welcomeMessage, welcomeDuration);
         }
     }
 
-    // وقتی صحنه عوض میشه، دوباره Welcome رو نمایش بده
     private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
     {
+        // بعد از بارگذاری صحنه، دوباره TutorialText رو پیدا کن
+        isInitialized = false;
+        InitializeUI();
+
         if (showWelcomeOnStart && scene.name == "Level1")
         {
             ShowMessage(welcomeMessage, welcomeDuration);
@@ -75,9 +114,9 @@ public class UIManager : MonoBehaviour
 
     public void ShowMessage(string message, float duration = 3f)
     {
-        if (tutorialText == null)
+        if (!isInitialized || tutorialText == null)
         {
-            Debug.LogError("❌ TutorialText is null in UIManager!");
+            Debug.LogWarning($"Cannot show message '{message}': UIManager not initialized!");
             return;
         }
 
@@ -96,7 +135,7 @@ public class UIManager : MonoBehaviour
         {
             tutorialText.text = message;
             tutorialText.gameObject.SetActive(true);
-            Debug.Log($"📢 Showing: {message}");
+            Debug.Log($"Showing: {message}");
 
             yield return new WaitForSeconds(duration);
 
@@ -143,8 +182,7 @@ public class UIManager : MonoBehaviour
         GameManager.Instance?.RestartLevel();
     }
 
-    public void
-OnResumeButtonClicked()
+    public void OnResumeButtonClicked()
     {
         TogglePause();
     }
@@ -155,3 +193,4 @@ OnResumeButtonClicked()
         SceneManager.LoadScene("MainMenu");
     }
 }
+

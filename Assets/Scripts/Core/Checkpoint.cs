@@ -38,10 +38,10 @@ public class Checkpoint : MonoBehaviour
         isActive = true;
         UpdateSprite();
         GameManager.Instance?.SetCheckpoint(transform.position);
-        Debug.Log($"📍 Checkpoint activated at: {transform.position}");
+        Debug.Log($"Checkpoint activated at: {transform.position}");
 
         // نمایش پیغام
-        UIManager.Instance?.ShowMessage("📍 Checkpoint Saved!", 1.5f);
+        UIManager.Instance?.ShowMessage(" Checkpoint Saved!", 1.5f);
     }
 
     private void UpdateSprite()

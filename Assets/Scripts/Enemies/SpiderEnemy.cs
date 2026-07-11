@@ -27,25 +27,21 @@ public class SpiderEnemy : EnemyStateMachine
 
     protected override void Patrol()
     {
-        // حرکت آرام چپ و راست
         float moveX = Mathf.Sin(Time.time * 0.5f) * moveSpeed * Time.deltaTime;
         transform.position += new Vector3(moveX, 0, 0);
 
-        // چرخش عنکبوت
         if (moveX > 0)
             transform.localScale = new Vector3(1, 1, 1);
         else if (moveX < 0)
             transform.localScale = new Vector3(-1, 1, 1);
 
-        // پرش دوره‌ای
         if (jumpTimer <= 0 && !isJumping)
         {
             Jump();
             jumpTimer = jumpInterval;
         }
 
-        // تشخیص بازیکن
-        if (IsPlayerInRange(detectionRange))
+        if (IsPlayerInRange(detectionRange) || IsShadowInRange(detectionRange))
         {
             SetState(EnemyState.Chase);
         }
@@ -53,21 +49,21 @@ public class SpiderEnemy : EnemyStateMachine
 
     protected override void Chase()
     {
-        if (target == null)
+        Transform chaseTarget = GetClosestTarget();
+
+        if (chaseTarget == null)
         {
             SetState(EnemyState.Patrol);
             return;
         }
 
-        // پرش به سمت بازیکن
         if (!isJumping)
         {
-            Vector2 direction = (target.position - transform.position).normalized;
+            Vector2 direction = (chaseTarget.position - transform.position).normalized;
             JumpToward(direction);
         }
 
-        // اگر نزدیک شد حمله کن
-        if (IsPlayerInRange(1.5f))
+        if (IsTargetInRange(chaseTarget, 1.5f))
         {
             SetState(EnemyState.Attack);
         }
@@ -75,14 +71,13 @@ public class SpiderEnemy : EnemyStateMachine
 
     protected override void Attack()
     {
-        // پرتاب تار به سمت بازیکن
-        if (target != null && webAttack != null)
+        Transform chaseTarget = GetClosestTarget();
+
+        if (chaseTarget != null && webAttack != null)
         {
             GameObject web = Instantiate(webAttack, transform.position, Quaternion.identity);
-            Vector2 direction = (target.position - transform.position).normalized;
+            Vector2 direction = (chaseTarget.position - transform.position).normalized;
             web.GetComponent<Rigidbody2D>().velocity = direction * 5f;
-
-            // بعد از 2 ثانیه نابودش کن
             Destroy(web, 2f);
         }
 
@@ -108,28 +103,74 @@ public class SpiderEnemy : EnemyStateMachine
         isJumping = false;
     }
 
+    private bool IsShadowInRange(float range)
+    {
+        GameObject shadow = GameObject.FindGameObjectWithTag("Shadow");
+        if (shadow == null) return false;
+        return Vector2.Distance(transform.position, shadow.transform.position) <= range;
+    }
+
+    private Transform GetClosestTarget()
+    {
+        GameObject player = GameObject.FindGameObjectWithTag("Player");
+        GameObject shadow = GameObject.FindGameObjectWithTag("Shadow");
+
+        if (player == null && shadow == null) return null;
+        if (player == null) return shadow.transform;
+        if (shadow == null) return player.transform;
+
+        float distToPlayer = Vector2.Distance(transform.position, player.transform.position);
+        float distToShadow = Vector2.Distance(transform.position, shadow.transform.position);
+
+        return distToPlayer < distToShadow ? player.transform : shadow.transform;
+    }
+
+    private bool IsTargetInRange(Transform target, float range)
+    {
+        if (target == null) return false;
+        return Vector2.Distance(transform.position, target.position) <= range;
+    }
+
+    // ===== اصلاح برخورد با Player =====
     private void OnCollisionEnter2D(Collision2D collision)
     {
         if (collision.gameObject.CompareTag("Player"))
         {
-            // اگر بازیکن در حالت نور باشه، می‌تونه عنکبوت رو بکشه
-            PlayerState playerState = collision.gameObject.GetComponent<PlayerState>();
-            if (playerState != null && !playerState.IsInShadowMode())
+            PlayerController player = collision.gameObject.GetComponent<PlayerController>();
+
+            // ===== بررسی Shield =====
+            if (player != null && player.HasShield())
             {
+                // با Shield، Player از عنکبوت رد میشه
+                player.UseShield();
+                Debug.Log("🛡️ Player used Shield to pass Spider!");
+
+                // عنکبوت رو نابود کن (اختیاری)
                 Die();
+                return;
             }
-            else if (playerState != null && playerState.IsInShadowMode())
-            {
-                // در حالت سایه، برخورد با عنکبوت = Game Over
-                GameManager.Instance?.GameOver();
-            }
+
+            // بدون Shield → GameOver
+            Debug.Log("Player touched Spider! Game Over!");
+            GameManager.Instance?.GameOver();
+        }
+        else if (collision.gameObject.CompareTag("Shadow"))
+        {
+            // سایه همیشه GameOver
+            Debug.Log("Shadow touched Spider! Game Over!");
+            GameManager.Instance?.GameOver();
         }
     }
 
     private void Die()
     {
-        // انیمیشن مرگ
         SetState(EnemyState.Dead);
-        Destroy(gameObject, 1f);
+        Destroy(gameObject, 0.5f);
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawWireSphere(transform.position, detectionRange);
     }
 }

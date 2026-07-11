@@ -23,14 +23,12 @@ public class PlayerState : MonoBehaviour
 
     private void Update()
     {
-        // ===== سوئیچ حالت با Shift =====
         if (Input.GetKeyDown(KeyCode.LeftShift) && !isSwitching)
         {
             Debug.Log("Shift pressed! Switching mode...");
             StartCoroutine(SwitchMode());
         }
 
-        // ===== مدیریت ورودی‌ها =====
         HandleInputs();
     }
 
@@ -45,9 +43,11 @@ public class PlayerState : MonoBehaviour
         isSwitching = true;
         Debug.Log($"Switching from {currentMode}...");
 
+        // ===== پخش صدای سوئیچ =====
+        AudioManager.Instance?.PlaySFX("SwitchMode");
+
         if (currentMode == PlayerMode.Light)
         {
-            // ===== از نور به سایه =====
             if (shadowController != null)
             {
                 shadowController.DetachFromPlayer();
@@ -57,7 +57,7 @@ public class PlayerState : MonoBehaviour
 
             if (playerController != null)
             {
-                playerController.SetActive(false);  // ← متد جدید
+                playerController.SetActive(false);
                 Debug.Log("PlayerController disabled!");
             }
 
@@ -66,7 +66,6 @@ public class PlayerState : MonoBehaviour
         }
         else
         {
-            // ===== از سایه به نور =====
             if (shadowController != null)
             {
                 Vector3 shadowPos = shadowController.transform.position;
@@ -74,7 +73,7 @@ public class PlayerState : MonoBehaviour
                 if (playerController != null)
                 {
                     playerController.transform.position = shadowPos;
-                    playerController.SetActive(true);  // ← متد جدید
+                    playerController.SetActive(true);
                     Debug.Log("PlayerController enabled!");
                 }
 
@@ -107,20 +106,17 @@ public class PlayerState : MonoBehaviour
                 return;
             }
 
-            // ===== حرکت با WASD =====
             float horizontal = 0f;
             if (Input.GetKey(KeyCode.A)) horizontal = -1f;
             if (Input.GetKey(KeyCode.D)) horizontal = 1f;
             shadowController.SetMoveInput(new Vector2(horizontal, 0f));
 
-            // ===== پرش با Space =====
             if (Input.GetKeyDown(KeyCode.Space))
             {
                 Debug.Log("Shadow Jump Pressed!");
                 shadowController.Jump();
             }
 
-            // ===== Teleport با E =====
             if (Input.GetKeyDown(KeyCode.E))
             {
                 Debug.Log("Shadow Teleport Pressed!");
